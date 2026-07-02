@@ -1,21 +1,29 @@
 const express = require("express");
 const router = express.Router();
 const multer = require("multer");
-const path = require("path");
+const { CloudinaryStorage } = require("multer-storage-cloudinary");
+const cloudinary = require("../config/cloudinary");
 const Application = require("../models/Application");
 const { protect, adminOnly } = require("../middleware/auth");
 
-// Payment screenshot multer config
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, "uploads/"),
-  filename: (req, file, cb) => cb(null, `payment_${Date.now()}${path.extname(file.originalname)}`)
+// Payment screenshot storage (Cloudinary)
+const paymentStorage = new CloudinaryStorage({
+  cloudinary,
+  params: {
+    folder: "trackmap/payments",
+    allowed_formats: ["jpg", "jpeg", "png", "webp"],
+  },
 });
-const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 } });
+const upload = multer({ storage: paymentStorage, limits: { fileSize: 5 * 1024 * 1024 } });
 
-// Certificate upload multer config
-const certStorage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, "uploads/"),
-  filename: (req, file, cb) => cb(null, `certificate_${Date.now()}${path.extname(file.originalname)}`)
+// Certificate upload storage (Cloudinary)
+const certStorage = new CloudinaryStorage({
+  cloudinary,
+  params: {
+    folder: "trackmap/certificates",
+    allowed_formats: ["pdf", "jpg", "jpeg", "png"],
+    resource_type: "auto",
+  },
 });
 const uploadCert = multer({ storage: certStorage, limits: { fileSize: 10 * 1024 * 1024 } });
 
@@ -45,7 +53,7 @@ router.post("/:id/payment", protect, upload.single("screenshot"), async (req, re
     const app = await Application.findById(req.params.id);
     if (!app) return res.status(404).json({ success: false, message: "Application not found" });
     app.utrId = req.body.utrId;
-    app.paymentScreenshot = req.file ? req.file.filename : "";
+    app.paymentScreenshot = req.file ? req.file.path : "";
     app.paymentStatus = "submitted";
     await app.save();
     res.json({ success: true, message: "Payment details submitted! Verification pending." });
@@ -140,9 +148,9 @@ router.put("/:id/upload-certificate", protect, adminOnly, uploadCert.single("cer
     const app = await Application.findById(req.params.id);
     if (!app) return res.status(404).json({ success: false, message: "Application not found" });
     if (!req.file) return res.status(400).json({ success: false, message: "No file uploaded" });
-    app.certificateFile = req.file.filename;
+    app.certificateFile = req.file.path;
     await app.save();
-    res.json({ success: true, message: "Certificate uploaded successfully!", filename: req.file.filename });
+    res.json({ success: true, message: "Certificate uploaded successfully!", filename: req.file.path });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
