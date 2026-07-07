@@ -10,6 +10,7 @@ const applicationSchema = new mongoose.Schema({
   semester: { type: String, required: true },
   regNo: { type: String, required: true },
   domain: { type: String, required: true },
+  duration: { type: String, required: true }, 
   skills: { type: String, required: false },
   whyJoin: { type: String, default: "" },
 
