@@ -59,4 +59,75 @@ router.post("/setup-admin", async (req, res) => {
   }
 });
 
+const nodemailer = require("nodemailer");
+const otpStore = {}; // temporary OTP storage
+
+// Transporter
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
+});
+
+// POST - Send OTP
+router.post("/send-otp", async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ success: false, message: "Email required" });
+
+    // Check if email already registered
+    const existing = await User.findOne({ email });
+    if (existing) return res.status(400).json({ success: false, message: "This email is already registered." });
+
+    // Generate 6 digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    
+    // Store OTP with 5 min expiry
+    otpStore[email] = { otp, expiry: Date.now() + 5 * 60 * 1000 };
+
+    // Send email
+    await transporter.sendMail({
+      from: `"TrackMap Innovations" <${process.env.EMAIL_USER}>`,
+      to: email,
+      subject: "Your OTP for TrackMap Registration",
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px; background: #0d1424; color: #f1f5f9; border-radius: 16px;">
+          <h2 style="color: #06b6d4; margin-bottom: 8px;">TrackMap Innovations</h2>
+          <p style="color: #94a3b8; margin-bottom: 24px;">Your OTP for registration</p>
+          <div style="background: #111827; border-radius: 12px; padding: 24px; text-align: center; margin-bottom: 24px;">
+            <p style="font-size: 2.5rem; font-weight: 800; letter-spacing: 0.2em; color: #06b6d4; margin: 0;">${otp}</p>
+          </div>
+          <p style="color: #94a3b8; font-size: 0.85rem;">This OTP is valid for <strong style="color: #f1f5f9;">5 minutes</strong>. Do not share it with anyone.</p>
+          <p style="color: #64748b; font-size: 0.78rem; margin-top: 16px;">TrackMap Innovations Pvt. Ltd. | DPIIT: DIPP229619</p>
+        </div>
+      `,
+    });
+
+    res.json({ success: true, message: "OTP sent successfully!" });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// POST - Verify OTP
+router.post("/verify-otp", async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+    const record = otpStore[email];
+
+    if (!record) return res.status(400).json({ success: false, message: "OTP not found. Please request again." });
+    if (Date.now() > record.expiry) {
+      delete otpStore[email];
+      return res.status(400).json({ success: false, message: "OTP expired. Please request again." });
+    }
+    if (record.otp !== otp) return res.status(400).json({ success: false, message: "Invalid OTP. Please try again." });
+
+    delete otpStore[email];
+    res.json({ success: true, message: "OTP verified successfully!" });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
 module.exports = router;
