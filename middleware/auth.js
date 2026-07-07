@@ -10,10 +10,10 @@ const protect = async (req, res, next) => {
       req.user = await User.findById(decoded.id).select("-password");
       next();
     } catch (err) {
-      return res.status(401).json({ success: false, message: "Token invalid hai" });
+      return res.status(401).json({ success: false, message: "Invalid Token" });
     }
   }
-  if (!token) return res.status(401).json({ success: false, message: "Login karein pehle" });
+  if (!token) return res.status(401).json({ success: false, message: "Please login first" });
 };
 
 const adminOnly = (req, res, next) => {
