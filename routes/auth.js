@@ -11,12 +11,12 @@ router.post("/register", async (req, res) => {
   try {
     const { fullName, email, phone, password } = req.body;
     const exists = await User.findOne({ email });
-    if (exists) return res.status(400).json({ success: false, message: "Email pehle se registered hai" });
+    if (exists) return res.status(400).json({ success: false, message: "This Email is already registered." });
 
     const user = await User.create({ fullName, email, phone, password });
     res.status(201).json({
       success: true,
-      message: "Account ban gaya! Ab login karein.",
+      message: "Account created successfully! You can now log in.",
       token: generateToken(user._id),
       user: { id: user._id, fullName: user.fullName, email: user.email, role: user.role }
     });
@@ -31,7 +31,7 @@ router.post("/login", async (req, res) => {
     const { email, password } = req.body;
     const user = await User.findOne({ email });
     if (!user || !(await user.matchPassword(password))) {
-      return res.status(400).json({ success: false, message: "Email ya password galat hai" });
+      return res.status(400).json({ success: false, message: "Invalid email or password." });
     }
     res.json({
       success: true,
@@ -48,12 +48,12 @@ router.post("/setup-admin", async (req, res) => {
   try {
     const { fullName, email, phone, password, setupKey } = req.body;
     if (setupKey !== process.env.ADMIN_SETUP_KEY) {
-      return res.status(403).json({ success: false, message: "Setup key galat hai" });
+      return res.status(403).json({ success: false, message: "Invalid setup key." });
     }
     const exists = await User.findOne({ email });
-    if (exists) return res.status(400).json({ success: false, message: "Email pehle se hai" });
+    if (exists) return res.status(400).json({ success: false, message: "This Email is already registered." });
     const admin = await User.create({ fullName, email, phone, password, role: "admin" });
-    res.status(201).json({ success: true, message: "Admin account ban gaya!", user: { email: admin.email, role: admin.role } });
+    res.status(201).json({ success: true, message: "Admin account created successfully!", user: { email: admin.email, role: admin.role } });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
