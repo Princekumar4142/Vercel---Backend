@@ -2,9 +2,21 @@ const express = require("express");
 const router = express.Router();
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
+const nodemailer = require("nodemailer");
 
 const generateToken = (id) =>
   jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: "7d" });
+
+const otpStore = {};
+
+// Transporter
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
+});
 
 // Register
 router.post("/register", async (req, res) => {
@@ -16,7 +28,7 @@ router.post("/register", async (req, res) => {
     const user = await User.create({ fullName, email, phone, password });
     res.status(201).json({
       success: true,
-      message: "Account created successfully! You can now log in.",
+      message: "Account created successfully!",
       token: generateToken(user._id),
       user: { id: user._id, fullName: user.fullName, email: user.email, role: user.role }
     });
@@ -43,7 +55,7 @@ router.post("/login", async (req, res) => {
   }
 });
 
-// Admin account banana (ek baar ke liye)
+// Admin setup
 router.post("/setup-admin", async (req, res) => {
   try {
     const { fullName, email, phone, password, setupKey } = req.body;
@@ -53,41 +65,30 @@ router.post("/setup-admin", async (req, res) => {
     const exists = await User.findOne({ email });
     if (exists) return res.status(400).json({ success: false, message: "This Email is already registered." });
     const admin = await User.create({ fullName, email, phone, password, role: "admin" });
-    res.status(201).json({ success: true, message: "Admin account created successfully!", user: { email: admin.email, role: admin.role } });
+    res.status(201).json({ success: true, message: "Admin account created!", user: { email: admin.email, role: admin.role } });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
-});
-
-const nodemailer = require("nodemailer");
-const otpStore = {}; // temporary OTP storage
-
-// Transporter
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
 });
 
 // POST - Send OTP
 router.post("/send-otp", async (req, res) => {
   try {
     const { email } = req.body;
+    console.log("OTP request for:", email);
+
     if (!email) return res.status(400).json({ success: false, message: "Email required" });
 
-    // Check if email already registered
     const existing = await User.findOne({ email });
     if (existing) return res.status(400).json({ success: false, message: "This email is already registered." });
 
-    // Generate 6 digit OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    
-    // Store OTP with 5 min expiry
     otpStore[email] = { otp, expiry: Date.now() + 5 * 60 * 1000 };
 
-    // Send email
+    console.log("Sending OTP:", otp, "to:", email);
+    console.log("EMAIL_USER:", process.env.EMAIL_USER);
+    console.log("EMAIL_PASS exists:", !!process.env.EMAIL_PASS);
+
     await transporter.sendMail({
       from: `"TrackMap Innovations" <${process.env.EMAIL_USER}>`,
       to: email,
@@ -105,8 +106,10 @@ router.post("/send-otp", async (req, res) => {
       `,
     });
 
+    console.log("OTP sent successfully to:", email);
     res.json({ success: true, message: "OTP sent successfully!" });
   } catch (err) {
+    console.error("OTP Send Error:", err.message, err);
     res.status(500).json({ success: false, message: err.message });
   }
 });
@@ -115,8 +118,9 @@ router.post("/send-otp", async (req, res) => {
 router.post("/verify-otp", async (req, res) => {
   try {
     const { email, otp } = req.body;
-    const record = otpStore[email];
+    console.log("Verifying OTP for:", email, "OTP:", otp);
 
+    const record = otpStore[email];
     if (!record) return res.status(400).json({ success: false, message: "OTP not found. Please request again." });
     if (Date.now() > record.expiry) {
       delete otpStore[email];
@@ -125,9 +129,12 @@ router.post("/verify-otp", async (req, res) => {
     if (record.otp !== otp) return res.status(400).json({ success: false, message: "Invalid OTP. Please try again." });
 
     delete otpStore[email];
+    console.log("OTP verified successfully for:", email);
     res.json({ success: true, message: "OTP verified successfully!" });
   } catch (err) {
+    console.error("OTP Verify Error:", err.message);
     res.status(500).json({ success: false, message: err.message });
   }
 });
+
 module.exports = router;
