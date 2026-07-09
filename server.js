@@ -17,6 +17,8 @@ app.use(cors({
 
 app.options("*", cors());
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
 
 // Certificate verify route
 app.get("/api/verify-cert", async (req, res) => {

@@ -3,6 +3,7 @@ const router = express.Router();
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 
+
 const generateToken = (id) =>
   jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: "7d" });
 
@@ -74,6 +75,7 @@ const transporter = nodemailer.createTransport({
 // POST - Send OTP
 router.post("/send-otp", async (req, res) => {
   try {
+  
     const { email } = req.body;
     if (!email) return res.status(400).json({ success: false, message: "Email required" });
 
@@ -106,7 +108,8 @@ router.post("/send-otp", async (req, res) => {
     });
 
     res.json({ success: true, message: "OTP sent successfully!" });
-  } catch (err) {
+  } 
+  catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
 });
@@ -130,4 +133,5 @@ router.post("/verify-otp", async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 });
+
 module.exports = router;
