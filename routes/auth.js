@@ -11,13 +11,26 @@ const generateToken = (id) =>
 router.post("/register", async (req, res) => {
   try {
     const { fullName, email, phone, password } = req.body;
+
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ success: false, message: "Invalid email address." });
+    }
+
+    // Phone validation
+    const phoneRegex = /^[6-9]\d{9}$/;
+    if (!phoneRegex.test(phone)) {
+      return res.status(400).json({ success: false, message: "Invalid phone number. Must be 10 digits starting with 6-9." });
+    }
+
     const exists = await User.findOne({ email });
-    if (exists) return res.status(400).json({ success: false, message: "This Email is already registered." });
+    if (exists) return res.status(400).json({ success: false, message: "This email is already registered." });
 
     const user = await User.create({ fullName, email, phone, password });
     res.status(201).json({
       success: true,
-      message: "Account created successfully! You can now log in.",
+      message: "Account created successfully!",
       token: generateToken(user._id),
       user: { id: user._id, fullName: user.fullName, email: user.email, role: user.role }
     });
@@ -44,7 +57,7 @@ router.post("/login", async (req, res) => {
   }
 });
 
-// Admin account banana (ek baar ke liye)
+// Admin setup
 router.post("/setup-admin", async (req, res) => {
   try {
     const { fullName, email, phone, password, setupKey } = req.body;
@@ -52,9 +65,9 @@ router.post("/setup-admin", async (req, res) => {
       return res.status(403).json({ success: false, message: "Invalid setup key." });
     }
     const exists = await User.findOne({ email });
-    if (exists) return res.status(400).json({ success: false, message: "This Email is already registered." });
+    if (exists) return res.status(400).json({ success: false, message: "This email is already registered." });
     const admin = await User.create({ fullName, email, phone, password, role: "admin" });
-    res.status(201).json({ success: true, message: "Admin account created successfully!", user: { email: admin.email, role: admin.role } });
+    res.status(201).json({ success: true, message: "Admin account created!", user: { email: admin.email, role: admin.role } });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
