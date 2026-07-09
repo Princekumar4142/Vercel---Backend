@@ -92,7 +92,7 @@ router.post("/send-otp", async (req, res) => {
     console.log("EMAIL_PASS exists:", !!process.env.EMAIL_PASS);
 
     await transporter.sendMail({
-      from: `"TrackMap Innovations" <${process.env.EMAIL_USER}>`,
+      ffrom: `"TrackMap Innovations" <b1615b001@smtp-brevo.com>`,
       to: email,
       subject: "Your OTP for TrackMap Registration",
       html: `
