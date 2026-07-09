@@ -2,23 +2,13 @@ const express = require("express");
 const router = express.Router();
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
-const nodemailer = require("nodemailer");
+const { Resend } = require("resend");
 
 const generateToken = (id) =>
   jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: "7d" });
 
+const resend = new Resend(process.env.RESEND_API_KEY);
 const otpStore = {};
-
-// Transporter
-const transporter = nodemailer.createTransport({
-  host: "smtp-relay.brevo.com",
-  port: 587,
-  secure: false,
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  }
-});
 
 // Register
 router.post("/register", async (req, res) => {
@@ -26,7 +16,6 @@ router.post("/register", async (req, res) => {
     const { fullName, email, phone, password } = req.body;
     const exists = await User.findOne({ email });
     if (exists) return res.status(400).json({ success: false, message: "This Email is already registered." });
-
     const user = await User.create({ fullName, email, phone, password });
     res.status(201).json({
       success: true,
@@ -88,11 +77,9 @@ router.post("/send-otp", async (req, res) => {
     otpStore[email] = { otp, expiry: Date.now() + 5 * 60 * 1000 };
 
     console.log("Sending OTP:", otp, "to:", email);
-    console.log("EMAIL_USER:", process.env.EMAIL_USER);
-    console.log("EMAIL_PASS exists:", !!process.env.EMAIL_PASS);
 
-    await transporter.sendMail({
-      ffrom: `"TrackMap Innovations" <b1615b001@smtp-brevo.com>`,
+    const { error } = await resend.emails.send({
+      from: "TrackMap Innovations <onboarding@resend.dev>",
       to: email,
       subject: "Your OTP for TrackMap Registration",
       html: `
@@ -102,16 +89,21 @@ router.post("/send-otp", async (req, res) => {
           <div style="background: #111827; border-radius: 12px; padding: 24px; text-align: center; margin-bottom: 24px;">
             <p style="font-size: 2.5rem; font-weight: 800; letter-spacing: 0.2em; color: #06b6d4; margin: 0;">${otp}</p>
           </div>
-          <p style="color: #94a3b8; font-size: 0.85rem;">This OTP is valid for <strong style="color: #f1f5f9;">5 minutes</strong>. Do not share it with anyone.</p>
+          <p style="color: #94a3b8; font-size: 0.85rem;">Valid for <strong style="color: #f1f5f9;">5 minutes</strong>. Do not share.</p>
           <p style="color: #64748b; font-size: 0.78rem; margin-top: 16px;">TrackMap Innovations Pvt. Ltd. | DPIIT: DIPP229619</p>
         </div>
-      `,
+      `
     });
+
+    if (error) {
+      console.error("Resend Error:", error);
+      return res.status(500).json({ success: false, message: error.message });
+    }
 
     console.log("OTP sent successfully to:", email);
     res.json({ success: true, message: "OTP sent successfully!" });
   } catch (err) {
-    console.error("OTP Send Error:", err.message, err);
+    console.error("OTP Send Error:", err.message);
     res.status(500).json({ success: false, message: err.message });
   }
 });
@@ -120,7 +112,7 @@ router.post("/send-otp", async (req, res) => {
 router.post("/verify-otp", async (req, res) => {
   try {
     const { email, otp } = req.body;
-    console.log("Verifying OTP for:", email, "OTP:", otp);
+    console.log("Verifying OTP for:", email);
 
     const record = otpStore[email];
     if (!record) return res.status(400).json({ success: false, message: "OTP not found. Please request again." });
@@ -131,7 +123,7 @@ router.post("/verify-otp", async (req, res) => {
     if (record.otp !== otp) return res.status(400).json({ success: false, message: "Invalid OTP. Please try again." });
 
     delete otpStore[email];
-    console.log("OTP verified successfully for:", email);
+    console.log("OTP verified for:", email);
     res.json({ success: true, message: "OTP verified successfully!" });
   } catch (err) {
     console.error("OTP Verify Error:", err.message);
