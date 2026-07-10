@@ -78,11 +78,14 @@ const otpStore = {}; // temporary OTP storage
 
 // Transporter
 const transporter = nodemailer.createTransport({
-  service: "gmail",
+  host: "smtp.gmail.com",
+  port: 465,
+  secure: true,
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
   },
+  family: 4,   // IPv4 force karega, IPv6 ENETUNREACH fix karega
 });
 
 // POST - Send OTP
@@ -93,8 +96,8 @@ router.post("/send-otp", async (req, res) => {
     if (!email) return res.status(400).json({ success: false, message: "Email required" });
 
     // Check if email already registered
-    const existing = await User.findOne({ email });
-    if (existing) return res.status(400).json({ success: false, message: "This email is already registered." });
+    // const existing = await User.findOne({ email });
+    // if (existing) return res.status(400).json({ success: false, message: "This email is already registered." });
 
     // Generate 6 digit OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
