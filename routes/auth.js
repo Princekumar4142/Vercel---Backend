@@ -107,7 +107,7 @@ router.post("/send-otp", async (req, res) => {
 
     // Send email
     await transporter.sendMail({
-      from: `"TrackMap Innovations" <${process.env.EMAIL_USER}>`,
+      from: `"TrackMap Innovations" <noreply@trackmapinnovations.in>`,
       to: email,
       subject: "Your OTP for TrackMap Registration",
       html: `
