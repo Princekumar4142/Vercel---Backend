@@ -78,14 +78,11 @@ const otpStore = {}; // temporary OTP storage
 
 // Transporter
 const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",
-  port: 465,
-  secure: true,
+  service: "gmail",
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
-  },
-  family: 4,   // IPv4 force karega, IPv6 ENETUNREACH fix karega
+  }
 });
 
 // POST - Send OTP
