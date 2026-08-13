@@ -95,7 +95,7 @@ router.post("/send-otp", async (req, res) => {
 
     // Send email via Resend (HTTPS API, no SMTP port issues on Railway)
     const { error } = await resend.emails.send({
-      from: "TrackMap Innovations <onboarding@resend.dev>",
+      from: "TrackMap Innovations <noreply@trackmapinnovations.in>",
       to: email,
       subject: "Your OTP for TrackMap Registration",
       html: `
