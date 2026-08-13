@@ -2,7 +2,9 @@ const express = require("express");
 const router = express.Router();
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
+const { Resend } = require("resend");
 
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 const generateToken = (id) =>
   jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: "7d" });
@@ -73,22 +75,11 @@ router.post("/setup-admin", async (req, res) => {
   }
 });
 
-const nodemailer = require("nodemailer");
 const otpStore = {}; // temporary OTP storage
-
-// Transporter
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  }
-});
 
 // POST - Send OTP
 router.post("/send-otp", async (req, res) => {
   try {
-  
     const { email } = req.body;
     if (!email) return res.status(400).json({ success: false, message: "Email required" });
 
@@ -98,13 +89,13 @@ router.post("/send-otp", async (req, res) => {
 
     // Generate 6 digit OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    
+
     // Store OTP with 5 min expiry
     otpStore[email] = { otp, expiry: Date.now() + 5 * 60 * 1000 };
 
-    // Send email
-    await transporter.sendMail({
-      from: `"TrackMap Innovations" <${process.env.EMAIL_USER}>`,
+    // Send email via Resend (HTTPS API, no SMTP port issues on Railway)
+    const { error } = await resend.emails.send({
+      from: "TrackMap Innovations <onboarding@resend.dev>",
       to: email,
       subject: "Your OTP for TrackMap Registration",
       html: `
@@ -120,8 +111,13 @@ router.post("/send-otp", async (req, res) => {
       `,
     });
 
+    if (error) {
+      console.error("Resend error:", error);
+      return res.status(500).json({ success: false, message: error.message || "Failed to send OTP email." });
+    }
+
     res.json({ success: true, message: "OTP sent successfully!" });
-  } 
+  }
   catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
