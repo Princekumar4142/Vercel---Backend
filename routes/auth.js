@@ -73,10 +73,12 @@ router.post("/setup-admin", async (req, res) => {
   }
 });
 
+const { Resend } = require("resend");
+const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 const nodemailer = require("nodemailer");
 const otpStore = {}; // temporary OTP storage
 
-// Transporter
+// Transporter (Fallback for local nodemailer)
 const transporter = nodemailer.createTransport({
   host: "smtp.gmail.com",
   port: 465,
@@ -105,27 +107,46 @@ router.post("/send-otp", async (req, res) => {
     // Store OTP with 5 min expiry
     otpStore[email] = { otp, expiry: Date.now() + 5 * 60 * 1000 };
 
-    // Send email
-    await transporter.sendMail({
-      from: `"TrackMap Innovations" <${process.env.EMAIL_USER}>`,
-      to: email,
-      subject: "Your OTP for TrackMap Registration",
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px; background: #0d1424; color: #f1f5f9; border-radius: 16px;">
-          <h2 style="color: #06b6d4; margin-bottom: 8px;">TrackMap Innovations</h2>
-          <p style="color: #94a3b8; margin-bottom: 24px;">Your OTP for registration</p>
-          <div style="background: #111827; border-radius: 12px; padding: 24px; text-align: center; margin-bottom: 24px;">
-            <p style="font-size: 2.5rem; font-weight: 800; letter-spacing: 0.2em; color: #06b6d4; margin: 0;">${otp}</p>
-          </div>
-          <p style="color: #94a3b8; font-size: 0.85rem;">This OTP is valid for <strong style="color: #f1f5f9;">5 minutes</strong>. Do not share it with anyone.</p>
-          <p style="color: #64748b; font-size: 0.78rem; margin-top: 16px;">TrackMap Innovations Pvt. Ltd. | DPIIT: DIPP229619</p>
+    const emailHtml = `
+      <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px; background: #0d1424; color: #f1f5f9; border-radius: 16px;">
+        <h2 style="color: #06b6d4; margin-bottom: 8px;">TrackMap Innovations</h2>
+        <p style="color: #94a3b8; margin-bottom: 24px;">Your OTP for registration</p>
+        <div style="background: #111827; border-radius: 12px; padding: 24px; text-align: center; margin-bottom: 24px;">
+          <p style="font-size: 2.5rem; font-weight: 800; letter-spacing: 0.2em; color: #06b6d4; margin: 0;">${otp}</p>
         </div>
-      `,
-    });
+        <p style="color: #94a3b8; font-size: 0.85rem;">This OTP is valid for <strong style="color: #f1f5f9;">5 minutes</strong>. Do not share it with anyone.</p>
+        <p style="color: #64748b; font-size: 0.78rem; margin-top: 16px;">TrackMap Innovations Pvt. Ltd. | DPIIT: DIPP229619</p>
+      </div>
+    `;
+
+    // Send email using Resend (ideal for Render/Cloud where SMTP is blocked)
+    if (resend) {
+      const fromEmail = process.env.RESEND_FROM || "TrackMap Innovations <onboarding@resend.dev>";
+      const { data, error } = await resend.emails.send({
+        from: fromEmail,
+        to: email,
+        subject: "Your OTP for TrackMap Registration",
+        html: emailHtml,
+      });
+
+      if (error) {
+        console.error("Resend error:", error);
+        return res.status(500).json({ success: false, message: error.message || "Failed to send OTP via Resend" });
+      }
+    } else {
+      // Fallback to nodemailer if Resend is not configured
+      await transporter.sendMail({
+        from: `"TrackMap Innovations" <${process.env.EMAIL_USER}>`,
+        to: email,
+        subject: "Your OTP for TrackMap Registration",
+        html: emailHtml,
+      });
+    }
 
     res.json({ success: true, message: "OTP sent successfully!" });
   } 
   catch (err) {
+    console.error("Send OTP catch error:", err);
     res.status(500).json({ success: false, message: err.message });
   }
 });
