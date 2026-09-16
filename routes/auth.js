@@ -2,7 +2,23 @@ const express = require("express");
 const router = express.Router();
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
+const { Resend } = require("resend");
+const nodemailer = require("nodemailer");
 
+const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
+const otpStore = {}; // temporary OTP storage
+
+// Transporter (Fallback for local nodemailer)
+const transporter = nodemailer.createTransport({
+  host: "smtp.gmail.com",
+  port: 465,
+  secure: true,
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
+  family: 4,   // IPv4 force karega, IPv6 ENETUNREACH fix karega
+});
 
 const generateToken = (id) =>
   jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: "7d" });
@@ -73,27 +89,10 @@ router.post("/setup-admin", async (req, res) => {
   }
 });
 
-const { Resend } = require("resend");
-const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
-const nodemailer = require("nodemailer");
-const otpStore = {}; // temporary OTP storage
-
-// Transporter (Fallback for local nodemailer)
-const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",
-  port: 465,
-  secure: true,
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-  family: 4,   // IPv4 force karega, IPv6 ENETUNREACH fix karega
-});
 
 // POST - Send OTP
 router.post("/send-otp", async (req, res) => {
   try {
-  
     const { email } = req.body;
     if (!email) return res.status(400).json({ success: false, message: "Email required" });
 
@@ -103,7 +102,7 @@ router.post("/send-otp", async (req, res) => {
 
     // Generate 6 digit OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    
+
     // Store OTP with 5 min expiry
     otpStore[email] = { otp, expiry: Date.now() + 5 * 60 * 1000 };
 
@@ -144,7 +143,7 @@ router.post("/send-otp", async (req, res) => {
     }
 
     res.json({ success: true, message: "OTP sent successfully!" });
-  } 
+  }
   catch (err) {
     console.error("Send OTP catch error:", err);
     res.status(500).json({ success: false, message: err.message });
