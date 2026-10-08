@@ -45,6 +45,7 @@ app.use("/api/auth", require("./routes/auth"));
 app.use("/api/applications", require("./routes/applications"));
 
 app.get("/", (req, res) => res.send("TrackMap V2 API Running 🚀"));
+app.get("/health", (req, res) => res.status(200).json({ status: "alive", uptime: process.uptime() }));
 
 const PORT = process.env.PORT || 5000;
 
