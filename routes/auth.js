@@ -120,7 +120,7 @@ router.post("/send-otp", async (req, res) => {
 
     // Send email using Resend (ideal for Render/Cloud where SMTP is blocked)
     if (resend) {
-      const fromEmail = process.env.RESEND_FROM || "TrackMap Innovations <onboarding@resend.dev>";
+      const fromEmail = process.env.RESEND_FROM || "TrackMap Innovations <noreply@trackmapinnovations.in>";
       const { data, error } = await resend.emails.send({
         from: fromEmail,
         to: email,
@@ -130,7 +130,20 @@ router.post("/send-otp", async (req, res) => {
 
       if (error) {
         console.error("Resend error:", error);
-        return res.status(500).json({ success: false, message: error.message || "Failed to send OTP via Resend" });
+        // Fallback to nodemailer if Resend fails
+        try {
+          console.log("Attempting nodemailer fallback...");
+          await transporter.sendMail({
+            from: `"TrackMap Innovations" <${process.env.EMAIL_USER}>`,
+            to: email,
+            subject: "Your OTP for TrackMap Registration",
+            html: emailHtml,
+          });
+          return res.json({ success: true, message: "OTP sent successfully!" });
+        } catch (fallbackErr) {
+          console.error("Nodemailer fallback failed:", fallbackErr);
+          return res.status(500).json({ success: false, message: error.message || "Failed to send OTP via Resend" });
+        }
       }
     } else {
       // Fallback to nodemailer if Resend is not configured
